@@ -96,6 +96,8 @@ private:
 
   void CalculatePredicatedMeanCovariance();
 
+  void Updates(const VectorXd& z, const MatrixXd& S);
+
 public:
 
   /**

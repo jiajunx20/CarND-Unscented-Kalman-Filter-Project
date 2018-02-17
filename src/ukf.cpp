@@ -201,6 +201,37 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the lidar NIS.
   */
+  const int n_z_ = 2;
+  // mean predicted measurement
+  VectorXd z_pred = VectorXd(n_z_);
+
+  // measurements covariance matrix
+  MatrixXd S = MatrixXd(n_z, n_z_);
+
+  // predicted measurements matrix
+  MatrixXd Zsig = MatrixXd(n_z_, 2 * n_aug_ + 1);
+
+  for (size_t i = 0; i != 2 * n_aug_ + 1; ++i)
+  {
+    Zsig(0, i) = Xsig_pred_(0, i);
+    Zsig(1, i) = Xsig_pred_(1, i);
+  }
+
+  // calculate mean
+  for (size_t i = 0; i != 2 * n_aug_ + 1; ++i)
+  {
+    z_pred = z_pred + weights(i) * Zsig.col(i);
+  }
+
+  for (size_t i = 0; i != 2 * n_aug_ + 1; ++i)
+  {
+    S = S + weights(i) * ((Zsig.col(i) - z_pred) * (Zsig.col(i) - z_pred).transpose());
+  }
+
+  S(0, 0) += pow(std_laspx_, 2);
+  S(1, 1) += pow(std_laspy_, 2);
+
+  Update(meas_package.raw_measurements_, S);
 }
 
 /**
@@ -259,7 +290,11 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   S(1, 1) += pow(std_radphi_, 2);
   S(2, 2) += pow(std_radrd_, 2);
   
-  VectorXd z = meas_package.raw_measurements_;
+  Update(meas_package.raw_measurements_, S);
+}
+
+void UKF::Update(const VectorXd& z, const MatrixXd& S)
+{
 
   MatrixXd Tc = MatrixXd(n_x_, n_z_);  
 
