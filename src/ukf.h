@@ -11,12 +11,6 @@ using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
 class UKF {
-
-public:
-
-  ///* state vector: [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
-  VectorXd x_;
-
 private:
 
   ///* initially set to false, set to true in first call of ProcessMeasurement
@@ -27,6 +21,9 @@ private:
 
   ///* if this is false, radar measurements will be ignored (except for init)
   bool use_radar_;
+
+  ///* state vector: [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
+  VectorXd x_;
 
   ///* state covariance matrix
   MatrixXd P_;
@@ -119,7 +116,11 @@ public:
    */
   void ProcessMeasurement(const MeasurementPackage& meas_package);
 
+  const VectorXd& x() const;
 
 };
+
+inline
+const VectorXd& UKF::x() const {return x_;}
 
 #endif /* UKF_H */
