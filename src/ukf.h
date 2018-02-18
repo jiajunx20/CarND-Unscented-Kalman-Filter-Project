@@ -11,6 +11,12 @@ using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
 class UKF {
+
+public:
+
+  ///* state vector: [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
+  VectorXd x_;
+
 private:
 
   ///* initially set to false, set to true in first call of ProcessMeasurement
@@ -21,9 +27,6 @@ private:
 
   ///* if this is false, radar measurements will be ignored (except for init)
   bool use_radar_;
-
-  ///* state vector: [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
-  VectorXd x_;
 
   ///* state covariance matrix
   MatrixXd P_;
@@ -41,28 +44,28 @@ private:
   double std_yawdd_;
 
   ///* Laser measurement noise standard deviation position1 in m
-  const double std_laspx_;
+  double std_laspx_;
 
   ///* Laser measurement noise standard deviation position2 in m
-  const double std_laspy_;
+  double std_laspy_;
 
   ///* Radar measurement noise standard deviation radius in m
-  const double std_radr_;
+  double std_radr_;
 
   ///* Radar measurement noise standard deviation angle in rad
-  const double std_radphi_;
+  double std_radphi_;
 
   ///* Radar measurement noise standard deviation radius change in m/s
-  const double std_radrd_ ;
+  double std_radrd_ ;
 
   ///* Weights of sigma points
   VectorXd weights_;
 
   ///* State dimension
-  const int n_x_;
+  int n_x_;
 
   ///* Augmented state dimension
-  const int n_aug_;
+  int n_aug_;
 
   ///* Sigma point spreading parameter
   double lambda_;
@@ -81,13 +84,13 @@ private:
    * Updates the state and the state covariance matrix using a laser measurement
    * @param meas_package The measurement at k+1
    */
-  void UpdateLidar(MeasurementPackage meas_package);
+  void UpdateLidar(const MeasurementPackage& meas_package);
 
   /**
    * Updates the state and the state covariance matrix using a radar measurement
    * @param meas_package The measurement at k+1
    */
-  void UpdateRadar(MeasurementPackage meas_package);
+  void UpdateRadar(const MeasurementPackage& meas_package);
 
   /**
    * Calculate Augmented Sigma points
@@ -96,7 +99,7 @@ private:
 
   void CalculatePredicatedMeanCovariance();
 
-  void Updates(const VectorXd& z, const MatrixXd& S);
+  void Update(const VectorXd& z, const VectorXd& z_pred, const MatrixXd& S, const MatrixXd& Zsig);
 
 public:
 
@@ -114,7 +117,7 @@ public:
    * ProcessMeasurement
    * @param meas_package The latest measurement data of either radar or laser
    */
-  void ProcessMeasurement(MeasurementPackage meas_package);
+  void ProcessMeasurement(const MeasurementPackage& meas_package);
 
 
 };

@@ -71,9 +71,9 @@ UKF::UKF() {
   lambda_ = 3 - n_x_;
 
   // weights vector
-  weights = VectorXd(2 * n_aug_ + 1);
-  weights.fill(0.5 / (lambda_ + n_aug_));
-  weights(0) = lambda_ / (lambda_ + n_aug_);
+  weights_ = VectorXd(2 * n_aug_ + 1);
+  weights_.fill(0.5 / (lambda_ + n_aug_));
+  weights_(0) = lambda_ / (lambda_ + n_aug_);
 
   // Augmented sigma points
   Xsig_aug_ = MatrixXd(n_aug_, 2 * n_aug_ + 1);
@@ -86,7 +86,7 @@ UKF::~UKF() {}
  * @param {MeasurementPackage} meas_package The latest measurement data of
  * either radar or laser.
  */
-void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
+void UKF::ProcessMeasurement(const MeasurementPackage& meas_package) {
   /**
   TODO:
 
@@ -111,7 +111,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       const float px = meas_package.raw_measurements_[0];
       const float py = meas_package.raw_measurements_[1];
 
-      x_ << px, py, 0, arctan2(py, px), 0;
+      x_ << px, py, 0, atan2(py, px), 0;
     }
 
     time_us_ = meas_package.timestamp_;
@@ -121,8 +121,8 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     return;
   }
   
-  float dt = (measurement_pack.timestamp_ - previous_timestamp_) / 1000000.0;
-  previous_timestamp_ = measurement_pack.timestamp_;
+  float dt = (meas_package.timestamp_ - time_us_) / 1000000.0;
+  time_us_ = meas_package.timestamp_;
 
   // Predict
   Prediction(dt);
@@ -130,12 +130,12 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   // Update
   if (use_radar_  && meas_package.sensor_type_ == MeasurementPackage::RADAR) {
     // Radar updates
-    ekf_.UpdateRadar(meas_package);
+    UpdateRadar(meas_package);
   } 
 
   if (use_laser_ && meas_package.sensor_type_ == MeasurementPackage::LASER) {
     // Laser updates
-    ekf_.UpdateLidar(meas_package);
+    UpdateLidar(meas_package);
   }
 
   // print the output
@@ -181,18 +181,19 @@ void UKF::Prediction(double delta_t) {
 
     vec(2) = v + a * delta_t;
     vec(3) = fi + fi_dot * delta_t + fi_dd * pow(delta_t, 2) / 2;
-    vec(4) = fi_dot = fi_dd * dt;
+    vec(4) = fi_dot = fi_dd * delta_t;
 
     Xsig_pred_.col(i) = vec;
+  }
 
-    CalculatePredicatedMeanCovariance();
+  CalculatePredicatedMeanCovariance();
 }
 
 /**
  * Updates the state and the state covariance matrix using a laser measurement.
  * @param {MeasurementPackage} meas_package
  */
-void UKF::UpdateLidar(MeasurementPackage meas_package) {
+void UKF::UpdateLidar(const MeasurementPackage& meas_package) {
   /**
   TODO:
 
@@ -206,7 +207,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   VectorXd z_pred = VectorXd(n_z_);
 
   // measurements covariance matrix
-  MatrixXd S = MatrixXd(n_z, n_z_);
+  MatrixXd S = MatrixXd(n_z_, n_z_);
 
   // predicted measurements matrix
   MatrixXd Zsig = MatrixXd(n_z_, 2 * n_aug_ + 1);
@@ -220,25 +221,26 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   // calculate mean
   for (size_t i = 0; i != 2 * n_aug_ + 1; ++i)
   {
-    z_pred = z_pred + weights(i) * Zsig.col(i);
+    z_pred = z_pred + weights_(i) * Zsig.col(i);
   }
 
   for (size_t i = 0; i != 2 * n_aug_ + 1; ++i)
   {
-    S = S + weights(i) * ((Zsig.col(i) - z_pred) * (Zsig.col(i) - z_pred).transpose());
+    S = S + weights_(i) * ((Zsig.col(i) - z_pred) * (Zsig.col(i) - z_pred).transpose());
   }
 
   S(0, 0) += pow(std_laspx_, 2);
   S(1, 1) += pow(std_laspy_, 2);
 
-  Update(meas_package.raw_measurements_, S);
+  Update(meas_package.raw_measurements_, z_pred, S, Zsig);
+
 }
 
 /**
  * Updates the state and the state covariance matrix using a radar measurement.
  * @param {MeasurementPackage} meas_package
  */
-void UKF::UpdateRadar(MeasurementPackage meas_package) {
+void UKF::UpdateRadar(const MeasurementPackage& meas_package) {
   /**
   TODO:
 
@@ -253,7 +255,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   VectorXd z_pred = VectorXd(n_z_);
 
   // measurements covariance matrix
-  MatrixXd S = MatrixXd(n_z, n_z_);
+  MatrixXd S = MatrixXd(n_z_, n_z_);
 
   // predicted measurements matrix
   MatrixXd Zsig = MatrixXd(n_z_, 2 * n_aug_ + 1);
@@ -266,7 +268,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     double fi = Xsig_pred_(3, i);
     double fi_dot = Xsig_pred_(4, i);
 
-    double rou = sqrt(pow(px, 2), pow(py, 2));
+    double rou = sqrt(pow(px, 2) + pow(py, 2));
     double phi = atan2(py, px);
     double rou_dot = (px * cos(fi) * v + py * sin(fi) * v) / rou;
 
@@ -278,35 +280,38 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   // calculate mean
   for (size_t i = 0; i != 2 * n_aug_ + 1; ++i)
   {
-    z_pred = z_pred + weights(i) * Zsig.col(i);
+    z_pred = z_pred + weights_(i) * Zsig.col(i);
   }
 
   for (size_t i = 0; i != 2 * n_aug_ + 1; ++i)
   {
-    S = S + weights(i) * ((Zsig.col(i) - z_pred) * (Zsig.col(i) - z_pred).transpose());
+    S = S + weights_(i) * ((Zsig.col(i) - z_pred) * (Zsig.col(i) - z_pred).transpose());
   }
 
   S(0, 0) += pow(std_radr_, 2);
   S(1, 1) += pow(std_radphi_, 2);
   S(2, 2) += pow(std_radrd_, 2);
   
-  Update(meas_package.raw_measurements_, S);
+  Update(meas_package.raw_measurements_, z_pred, S, Zsig);
+
 }
 
-void UKF::Update(const VectorXd& z, const MatrixXd& S)
+void UKF::Update(const VectorXd& z, const VectorXd& z_pred, const MatrixXd& S, const MatrixXd& Zsig)
 {
+
+  const int n_z_ = z.size();
 
   MatrixXd Tc = MatrixXd(n_x_, n_z_);  
 
   for (size_t i = 0; i != 2 * n_aug_ + 1; ++i)
   {
-    Tc = Tc + weights(i) * (Xsig_pred_.col(i) - x_) * (Zsig.col(i) - z_pred).transpose();
+    Tc = Tc + weights_(i) * (Xsig_pred_.col(i) - x_) * (Zsig.col(i) - z_pred).transpose();
   }
 
   MatrixXd K = Tc * S.inverse();
 
   x_ = x_ + K * (z - z_pred);
-  P_ = P - K * S * K.transpose();
+  P_ = P_ - K * S * K.transpose();
 
 }
 
@@ -333,7 +338,7 @@ void UKF::GenerateAugmentedSigmaPoints()
 
   MatrixXd Q = MatrixXd(2, 2);
   Q << std_a_ * std_a_, 0,
-    << 0, std_yawdd_ * std_yawdd_;
+       0, std_yawdd_ * std_yawdd_;
   
   P_aug.bottomRightCorner(2, 2) = Q;
 
@@ -354,12 +359,12 @@ void UKF::CalculatePredicatedMeanCovariance()
 {
   for (size_t i = 0; i != 2 * n_aug_ + 1; ++i)
   {
-    x_ = x_ + weights(i) * Xsig_pred_.col(i);
+    x_ = x_ + weights_(i) * Xsig_pred_.col(i);
   }
 
   for (size_t i = 0; i != 2 * n_aug_ + 1; ++i)
   {
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
-    P_ = P_ + weights(i) * x_diff * x_diff.transpose();
+    P_ = P_ + weights_(i) * x_diff * x_diff.transpose();
   }
 }
