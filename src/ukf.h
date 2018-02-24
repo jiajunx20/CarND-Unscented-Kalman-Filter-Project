@@ -94,9 +94,20 @@ private:
    */
   void GenerateAugmentedSigmaPoints();
 
+  /**
+   * Calculate predicted mean
+   */
   void CalculatePredicatedMeanCovariance();
 
+  /**
+   * Update the state and covariance matrix 
+   */
   void Update(const VectorXd& z, const VectorXd& z_pred, const MatrixXd& S, const MatrixXd& Zsig);
+
+  /**
+   * Normalize the angle
+   */
+  void NormalizeAngle(double& angle);
 
 public:
 

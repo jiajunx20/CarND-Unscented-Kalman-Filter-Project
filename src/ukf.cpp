@@ -292,26 +292,13 @@ void UKF::UpdateRadar(const MeasurementPackage& meas_package) {
   {
     z_pred = z_pred + weights_(i) * Zsig.col(i);
   }
-  while (z_pred(1) > M_PI)
-  {
-    z_pred(1) -= 2 * M_PI;
-  }
-  while (z_pred(1) < -1 * M_PI)
-  {
-    z_pred(1) += 2 * M_PI;
-  }
+
+  NormalizeAngle(z_pred(1));
 
   for (size_t i = 0; i != 2 * n_aug_ + 1; ++i)
   {
     VectorXd z_diff = Zsig.col(i) - z_pred;
-    while (z_diff(1) > M_PI)
-    {
-      z_diff(1) -= 2 * M_PI;
-    }
-    while (z_diff(1) < -1 * M_PI)
-    {
-      z_diff(1) += 2 * M_PI;
-    }
+    NormalizeAngle(z_diff(1));
 
     S = S + weights_(i) * (z_diff * z_diff.transpose());
   }
@@ -335,24 +322,10 @@ void UKF::Update(const VectorXd& z, const VectorXd& z_pred, const MatrixXd& S, c
   for (size_t i = 0; i != 2 * n_aug_ + 1; ++i)
   {
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
-    while (x_diff(3) > M_PI)
-    {
-      x_diff(3) -= 2 * M_PI;
-    }
-    while (x_diff(3) < -1 * M_PI)
-    {
-      x_diff(3) += 2 * M_PI;
-    }
+    NormalizeAngle(x_diff(3));
 
     VectorXd z_diff = Zsig.col(i) - z_pred;
-    while (z_diff(1) > M_PI)
-    {
-      z_diff(1) -= 2 * M_PI;
-    }
-    while (z_diff(1) < -1 * M_PI)
-    {
-      z_diff(1) += 2 * M_PI;
-    }
+    NormalizeAngle(z_diff(1));
 
     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
   }
@@ -360,24 +333,10 @@ void UKF::Update(const VectorXd& z, const VectorXd& z_pred, const MatrixXd& S, c
   MatrixXd K = Tc * S.inverse();
 
   VectorXd z_diff = z - z_pred;
-  while (z_diff(1) > M_PI)
-  {
-    z_diff(1) -= 2 * M_PI;
-  }
-  while (z_diff(1) < -1 * M_PI)
-  {
-    z_diff(1) += 2 * M_PI;
-  }
+  NormalizeAngle(z_diff(1));
 
   x_ = x_ + K * z_diff;
-  while (x_(3) > M_PI)
-  {
-    x_(3) -= 2 * M_PI;
-  }
-  while (x_(3) < -1 * M_PI)
-  {
-    x_(3) += 2 * M_PI;
-  }
+  NormalizeAngle(x_(3));
   P_ = P_ - K * S * K.transpose();
 
 }
@@ -432,16 +391,21 @@ void UKF::CalculatePredicatedMeanCovariance()
   for (size_t i = 0; i != 2 * n_aug_ + 1; ++i)
   {
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
-    while (x_diff(3) > M_PI)
-    {
-      x_diff(3) -= 2 * M_PI;
-    }
-    while (x_diff(3) < -1 * M_PI)
-    {
-      x_diff(3) += 2 * M_PI;
-    }
+    NormalizeAngle(x_diff(3));
 
     P_ = P_ + weights_(i) * x_diff * x_diff.transpose();
   }
-
 }
+
+void UKF::NormalizeAngle(double& angle)
+{
+    while (angle > M_PI)
+    {
+      angle -= 2 * M_PI;
+    }
+    while (angle < -1 * M_PI)
+    {
+      angle += 2 * M_PI;
+    }
+}
+  
